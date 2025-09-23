@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: juice-shop
-          image: hacking9/juice-shop:develop-767d9fd
+          image: hacking9/juice-shop:develop-7530a64
           ports:
             - containerPort: 3000
           resources:
