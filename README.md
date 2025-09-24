@@ -1,2 +1,2 @@
 # eks-secobs
-Security and Observability on Amazon EKS with DevSecOps practices
+Security and Observability on Local KinD and Amazon EKS with DevSecOps practices
