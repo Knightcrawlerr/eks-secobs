@@ -1,24 +1,25 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: juice-shop
+  name: {{.Chart.Name}}
   labels:
-    app: juice-shop
+    app: {{.Chart.Name}}
 spec:
-  replicas: 2
+  replicas: {{.Values.replicaCount}}
   selector:
     matchLabels:
-      app: juice-shop
+      app: {{.Chart.Name}}
   template:
     metadata:
       labels:
-        app: juice-shop
+        app: {{.Chart.Name}}
     spec:
+      serviceAccountName: {{ include "juice-shop.serviceAccountName" . }}
       containers:
-        - name: juice-shop
-          image: hacking9/juice-shop:develop-7530a64
+        - name: {{.Chart.Name}}
+          image: {{.Values.image.repository}}:{{.Values.image.tag}}
           ports:
-            - containerPort: 3000
+            - containerPort: {{.Values.service.port}}
           resources:
             requests:
               cpu: "100m"
