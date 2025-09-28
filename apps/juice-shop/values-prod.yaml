@@ -1,7 +1,7 @@
 image:
   repository: hacking9/juice-shop
   pullPolicy: Always
-  tag: "prod-1937f09"
+  tag: "prod-8e73e54"
 
 replicaCount: 2
 
