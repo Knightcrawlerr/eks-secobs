@@ -1,0 +1,42 @@
+image:
+  repository: hacking9/juice-shop
+  pullPolicy: Always
+  tag: "develop-7530a64"
+
+replicaCount: 2
+
+app:
+  ingress:
+    enabled: true
+    host: juice-shop.com
+
+argocd:
+  ingress:
+    enabled: true
+    host: argocd.juice-shop.com
+
+serviceAccount:
+  create: true
+  automount: true
+  name: ""
+  annotations: {}
+
+service:
+  type: ClusterIP
+  port: 3000
+
+  livenessProbe:
+  httpGet:
+    path: /
+    port: http
+readinessProbe:
+  httpGet:
+    path: /
+    port: http
+
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 4
+  targetCPUUtilizationPercentage: 80
