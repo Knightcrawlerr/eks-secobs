@@ -4,7 +4,10 @@ kind: HorizontalPodAutoscaler
 metadata:
   name: {{ include "juice-shop.fullname" . }}
   labels:
-    {{- include "juice-shop.labels" . | nindent 4 }}
+    app.kubernetes.io/name: {{ include "juice-shop.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/version: {{ .Chart.AppVersion }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
 spec:
   scaleTargetRef:
     apiVersion: apps/v1

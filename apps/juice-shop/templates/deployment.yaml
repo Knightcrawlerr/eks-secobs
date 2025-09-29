@@ -1,39 +1,36 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{.Chart.Name}}
+  name: {{ include "juice-shop.fullname" . }}
   labels:
-    app: {{.Chart.Name}}
+    app.kubernetes.io/name: {{ include "juice-shop.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/version: {{ .Chart.AppVersion }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
 spec:
   replicas: {{.Values.replicaCount}}
   selector:
     matchLabels:
-      app: {{.Chart.Name}}
+      app: {{ include "juice-shop.fullname" . }}
   template:
     metadata:
       labels:
-        app: {{.Chart.Name}}
+        app: {{ include "juice-shop.fullname" . }}
     spec:
       serviceAccountName: {{ include "juice-shop.serviceAccountName" . }}
       containers:
-        - name: {{.Chart.Name}}
+        - name: {{ include "juice-shop.fullname" . }}
           image: {{.Values.image.repository}}:{{.Values.image.tag}}
           ports:
             - containerPort: {{.Values.service.port}}
           resources:
-            requests:
-              cpu: "100m"
-              memory: "128Mi"
-            limits:
-              cpu: "500m"
-              memory: "512Mi"
+            {{- toYaml .Values.resources | nindent 12 }}
           securityContext:
-            runAsNonRoot: true
-            runAsUser: 65532
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-                - ALL
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
   strategy:
     type: RollingUpdate
     rollingUpdate:
