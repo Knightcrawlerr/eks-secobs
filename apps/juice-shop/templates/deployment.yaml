@@ -23,6 +23,7 @@ spec:
           image: {{.Values.image.repository}}:{{.Values.image.tag}}
           ports:
             - containerPort: {{.Values.service.port}}
+              name: http
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           securityContext:

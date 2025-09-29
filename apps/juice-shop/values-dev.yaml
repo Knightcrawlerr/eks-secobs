@@ -57,11 +57,11 @@ securityContext:
 livenessProbe:
   httpGet:
     path: /
-    port: 3000
+    port: http
 readinessProbe:
   httpGet:
     path: /
-    port: 3000
+    port: http
 
 autoscaling:
   enabled: true
