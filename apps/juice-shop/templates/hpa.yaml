@@ -3,7 +3,6 @@ apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: {{ include "juice-shop.fullname" . }}
-  namespace: {{ .Release.Namespace }}
   labels:
     app.kubernetes.io/name: {{ include "juice-shop.name" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}

@@ -3,7 +3,6 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: {{ include "juice-shop.fullname" . }}-ingress
-  namespace: {{ .Release.Namespace }}
   labels:
     app.kubernetes.io/name: {{ include "juice-shop.name" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
