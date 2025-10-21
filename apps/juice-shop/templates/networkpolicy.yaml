@@ -10,6 +10,10 @@ metadata:
     app.kubernetes.io/managed-by: {{ .Release.Service }}
 spec:
   podSelector: {}
+  ingress:
+  - {}
+  egress:
+  - {}
   policyTypes:
     - Ingress
     - Egress
