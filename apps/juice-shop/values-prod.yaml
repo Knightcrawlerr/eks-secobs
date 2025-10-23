@@ -1,7 +1,7 @@
 image:
   repository: hacking9/juice-shop
   pullPolicy: IfNotPresent
-  tag: "prod-f8221e8"
+  tag: "prod-935ac9b"
 
 replicaCount: 2
 
