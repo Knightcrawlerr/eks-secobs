@@ -1,8 +1,8 @@
 replicaCount: 2
 
 image:
-  repository: hacking9/juice-shop
-  pullPolicy: IfNotPresent
+  repository: ghcr.io/knightcrawlerr/juice-shop
+  pullPolicy: Always
   tag: "sha-e8022d2aee0c7f2d9aad95eaed9e8f51f577cf18"
 
 serviceAccount:
@@ -10,7 +10,6 @@ serviceAccount:
   automount: true
   annotations: {}
   name: ""
-
 
 service:
   type: ClusterIP
@@ -55,7 +54,6 @@ securityContext:
     drop:
       - ALL
 
-
 livenessProbe:
   httpGet:
     path: /
@@ -70,12 +68,8 @@ readinessProbe:
   initialDelaySeconds: 15
   periodSeconds: 10
 
-
 autoscaling:
   enabled: true
   minReplicas: 2
   maxReplicas: 4
   targetCPUUtilizationPercentage: 80
-
-
-
