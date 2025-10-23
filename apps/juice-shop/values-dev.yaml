@@ -3,7 +3,7 @@ replicaCount: 2
 image:
   repository: hacking9/juice-shop
   pullPolicy: IfNotPresent
-  tag: "dev-066b01d"
+  tag: "sha-e8022d2aee0c7f2d9aad95eaed9e8f51f577cf18"
 
 serviceAccount:
   create: true
