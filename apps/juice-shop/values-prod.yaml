@@ -1,9 +1,13 @@
 image:
-  repository: hacking9/juice-shop
-  pullPolicy: IfNotPresent
-  tag: "prod-0382749"
+  repository: ghcr.io/knightcrawlerr/juice-shop
+  pullPolicy: Always
+  tag: "sha-085f7759d6ed777991b89f5804daaae14df8d170"
+
 
 replicaCount: 2
+
+networkPolicy:
+  enabled: true
 
 app:
   ingress:
@@ -39,10 +43,15 @@ livenessProbe:
   httpGet:
     path: /
     port: http
+  initialDelaySeconds: 15
+  periodSeconds: 10
+
 readinessProbe:
   httpGet:
     path: /
     port: http
+  initialDelaySeconds: 15
+  periodSeconds: 10
 
 resources:
   requests:
@@ -59,7 +68,6 @@ securityContext:
   capabilities:
     drop:
       - ALL
-
 
 autoscaling:
   enabled: true
