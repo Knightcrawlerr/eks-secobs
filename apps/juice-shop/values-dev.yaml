@@ -3,7 +3,7 @@ replicaCount: 2
 image:
   repository: ghcr.io/knightcrawlerr/juice-shop
   pullPolicy: Always
-  tag: "sha-085f7759d6ed777991b89f5804daaae14df8d170"
+  tag: "sha-2326add1d8c7df4f3081c787d511887393ef3606"
 
 serviceAccount:
   create: true
