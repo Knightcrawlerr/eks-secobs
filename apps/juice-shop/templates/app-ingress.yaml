@@ -8,6 +8,11 @@ metadata:
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/version: {{ .Chart.AppVersion }}
     app.kubernetes.io/managed-by: {{ .Release.Service }}
+  annotations:
+    # Force HTTPS redirect
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    # Request size limits (adjust based on your app needs)
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
 
 spec:
   ingressClassName: {{ .Values.app.ingress.className | default "nginx" }}

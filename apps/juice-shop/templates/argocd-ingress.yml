@@ -5,16 +5,20 @@ metadata:
   name: argocd-ingress
   namespace: argocd
   annotations:
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"
-    nginx.ingress.kubernetes.io/ssl-pass-through: "true"
+    # ArgoCD-specific: Pass through TLS to backend
+    # ArgoCD server handles its own TLS termination
+    nginx.ingress.kubernetes.io/ssl-passthrough: "true"
     nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+    
+    # Force HTTPS redirect
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
   labels:
     app.kubernetes.io/name: {{ include "juice-shop.name" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/version: {{ .Chart.AppVersion }}
     app.kubernetes.io/managed-by: {{ .Release.Service }}
 spec:
-  ingressClassName: nginx
+  ingressClassName: {{ .Values.app.ingress.className | default "nginx" }}
   rules:
     - host: {{ .Values.argocd.ingress.host }}
       http:

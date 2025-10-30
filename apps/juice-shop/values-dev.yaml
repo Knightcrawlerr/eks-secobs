@@ -38,6 +38,16 @@ argocd:
         hosts:
           - argocd.juice-shop.com
 
+monitoring:
+  ingress:
+    enabled: true
+    className: nginx
+    host: monitoring.juice-shop.com
+    tls:
+      - secretName: monitoring-tls
+        hosts:
+          - monitoring.juice-shop.com
+
 resources:
   requests:
     cpu: "100m"
