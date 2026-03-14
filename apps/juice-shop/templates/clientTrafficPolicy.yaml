@@ -1,0 +1,19 @@
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: ClientTrafficPolicy
+metadata:
+  name: {{ include "juice-shop.fullname" . }}-client-traffic-policy
+  namespace: {{ .Values.app.gateway.namespace }}
+  labels:
+    app.kubernetes.io/name: {{ include "juice-shop.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/version: {{ .Chart.AppVersion }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  targetRefs:
+  - group: gateway.networking.k8s.io
+    name: {{ .Values.app.gateway.name }}
+    kind: Gateway
+    sectionName: https
+  path:
+    disableMergeSlashes: true
+    escapedSlashesAction: KeepUnchanged

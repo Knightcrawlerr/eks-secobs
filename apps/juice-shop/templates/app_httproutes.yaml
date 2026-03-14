@@ -1,0 +1,26 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "juice-shop.fullname" . }}-httproute
+  labels:
+    app.kubernetes.io/name: {{ include "juice-shop.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/version: {{ .Chart.AppVersion }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  parentRefs:
+    - name: {{ .Values.app.gateway.name }}
+      namespace: {{ .Values.app.gateway.namespace }}
+      sectionName: https
+  hostnames:
+    - {{.Values.app.gateway.host}}
+  rules:
+    - backendRefs:
+        - name: {{ include "juice-shop.fullname" . }}
+          port: {{ .Values.service.port }}
+          kind: Service
+          weight: 1
+      matches:
+        - path:
+            type: PathPrefix
+            value: /

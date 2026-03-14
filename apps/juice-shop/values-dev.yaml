@@ -19,34 +19,24 @@ networkPolicy:
   enabled: true
 
 app:
-  ingress:
+  gateway:
+    name: eg
     enabled: true
-    className: nginx
     host: juice-shop.com
+    namespace: envoy-gateway-system
     tls:
       - secretName: juice-shop-tls
-        hosts:
-          - juice-shop.com
 
 argocd:
-  ingress:
-    enabled: true
-    className: nginx
-    host: argocd.juice-shop.com
-    tls:
-      - secretName: argocd-server-tls
-        hosts:
-          - argocd.juice-shop.com
+  name: argocd
+  namespace: argocd
+  host: argocd.juice-shop.com
+
 
 monitoring:
-  ingress:
-    enabled: true
-    className: nginx
-    host: monitoring.juice-shop.com
-    tls:
-      - secretName: monitoring-tls
-        hosts:
-          - monitoring.juice-shop.com
+  name: monitoring
+  namespace: monitoring
+  host: monitoring.juice-shop.com
 
 resources:
   requests:
