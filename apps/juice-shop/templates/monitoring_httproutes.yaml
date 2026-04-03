@@ -1,19 +1,39 @@
-apiVersion: gateway.envoyproxy.io/v1alpha1
-kind: ClientTrafficPolicy
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
 metadata:
-  name: {{ include "juice-shop.fullname" . }}-client-traffic-policy
-  namespace: {{ .Values.app.gateway.namespace }}
+  name: {{ include "juice-shop.fullname" . }}-monitoring-httproute
+  namespace: {{ .Values.monitoring.namespace }}
   labels:
     app.kubernetes.io/name: {{ include "juice-shop.name" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/version: {{ .Chart.AppVersion }}
     app.kubernetes.io/managed-by: {{ .Release.Service }}
 spec:
-  targetRefs:
-  - group: gateway.networking.k8s.io
-    name: {{ .Values.app.gateway.name }}
-    kind: Gateway
-    sectionName: https
-  path:
-    disableMergeSlashes: true
-    escapedSlashesAction: KeepUnchanged
+  parentRefs:
+    - name: {{ .Values.app.gateway.name }}
+      namespace: {{ .Values.app.gateway.namespace }}
+      sectionName: https
+  hostnames:
+    - {{.Values.monitoring.host}}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /grafana
+      backendRefs:
+        - name: monitoring-grafana
+          port: 80
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /prometheus
+      backendRefs:
+        - name: prometheus-operated
+          port: 9090
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /alertmanager
+      backendRefs:
+        - name: alertmanager-operated
+          port: 9093
