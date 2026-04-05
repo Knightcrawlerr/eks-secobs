@@ -1,4 +1,5 @@
 replicaCount: 2
+namespace: juice-shop
 
 image:
   repository: ghcr.io/knightcrawlerr/juice-shop
@@ -50,6 +51,7 @@ securityContext:
   runAsNonRoot: true
   runAsUser: 65532
   allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
   capabilities:
     drop:
       - ALL
