@@ -51,7 +51,6 @@ securityContext:
   runAsNonRoot: true
   runAsUser: 65532
   allowPrivilegeEscalation: false
-  readOnlyRootFilesystem: true
   capabilities:
     drop:
       - ALL
