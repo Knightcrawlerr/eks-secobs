@@ -35,6 +35,22 @@ spec:
             {{- toYaml .Values.readinessProbe | nindent 12 }}
       imagePullSecrets:
         - name: github-container-registry
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role
+                    operator: In
+                    values:
+                      - app
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: {{ include "juice-shop.fullname" . }}
   strategy:
     type: RollingUpdate
     rollingUpdate:
