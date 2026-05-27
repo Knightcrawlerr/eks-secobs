@@ -4,7 +4,7 @@ namespace: juice-shop
 image:
   repository: ghcr.io/knightcrawlerr/juice-shop
   pullPolicy: Always
-  tag: "sha-7732f0097af8e875d91e68d4c0fa78665b1158ac"
+  tag: "sha-d2eb74f793287b888325bb0f3aec84b6925e16cb"
 
 serviceAccount:
   create: true
