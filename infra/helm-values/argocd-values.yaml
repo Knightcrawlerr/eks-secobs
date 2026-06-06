@@ -1,0 +1,39 @@
+namespaceOverride: argocd
+configs:
+  cm:
+    url: https://argocd.juice-shop.com
+
+global:
+  nodeSelector:
+    node-role: platform
+  networkPolicy:
+    create: true
+    defaultDenyIngress: true
+
+controller:
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      namespace: monitoring
+      interval: 30s
+      additionalLabels:
+        release: monitoring
+
+repoServer:
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      namespace: monitoring
+      additionalLabels:
+        release: monitoring
+
+applicationSet:
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      namespace: monitoring
+      additionalLabels:
+        release: monitoring

@@ -1,0 +1,40 @@
+# Control plane controller — uses existing envoy-gateway ClusterIP Service
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: envoy-gateway-controller
+  namespace: monitoring
+  labels:
+    release: monitoring
+spec:
+  namespaceSelector:
+    matchNames:
+      - envoy-gateway-system
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gateway-helm
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+---
+# Data plane proxy pod — no backing Service, use PodMonitor
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: envoy-proxy-dataplane
+  namespace: monitoring
+  labels:
+    release: monitoring
+spec:
+  namespaceSelector:
+    matchNames:
+      - envoy-gateway-system
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: proxy
+      app.kubernetes.io/managed-by: envoy-gateway
+  podMetricsEndpoints:
+    - port: metrics       # containerPort 19001, name "metrics" — confirmed
+      path: /stats/prometheus
+      interval: 30s

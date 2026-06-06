@@ -1,0 +1,158 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: secobs-alert-rules
+  namespace: monitoring
+  labels:
+    release: monitoring
+spec:
+  groups:
+
+  # ── Runtime Security (Falco) ───────────────────────────────────────────────
+  - name: falco.rules
+    rules:
+    - alert: FalcoCriticalEventDetected
+      expr: |
+        increase(falcosecurity_falcosidekick_falco_events_total{priority_raw="critical"}[5m]) > 0
+      for: 0m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Falco critical event on {{ $labels.hostname }}"
+        description: "Rule '{{ $labels.rule }}' fired. Priority: critical. Check Kibana falco-alerts index."
+
+    - alert: FalcoWarningEventDetected
+      expr: |
+       increase(falcosecurity_falcosidekick_falco_events_total{priority_raw="warning"}[5m]) > 0
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Falco warning event on {{ $labels.hostname }}"
+        description: "Rule '{{ $labels.rule }}' fired. Priority: warning. Check Kibana falco-alerts index."
+    
+    - alert: FalcoTerminalShellInContainer
+      expr: |
+        increase(falcosecurity_falcosidekick_falco_events_total{rule="Terminal shell in container"}[2m]) > 0
+      for: 0m
+      labels:
+        severity: critical
+        mitre: "T1059"
+      annotations:
+        summary: "Interactive shell spawned in container on {{ $labels.hostname }}"
+        description: "Rule 'Terminal shell in container' fired on {{ $labels.pod }}. Immediate investigation required."
+        runbook_url: "https://falco.org/docs/rules/default-rules/#terminal-shell-in-container"
+
+    - alert: FalcoSensitiveFileRead
+      expr: |
+        increase(falcosecurity_falcosidekick_falco_events_total{rule="Read sensitive file untrusted"}[5m]) > 0
+      for: 0m
+      labels:
+        severity: critical
+        mitre: "T1555"
+      annotations:
+        summary: "Sensitive file read in container on {{ $labels.hostname }}"
+        description: "Rule 'Read sensitive file untrusted' fired. /etc/shadow or credential file accessed inside a container."
+        runbook_url: "https://falco.org/docs/rules/default-rules/#read-sensitive-file-untrusted"
+
+    - alert: FalcoContainerEscapeAttempt
+      expr: |
+        increase(falcosecurity_falcosidekick_falco_events_total{rule=~".*drop.*binary.*|.*privilege.*escalation.*"}[5m]) > 0
+      for: 0m
+      labels:
+        severity: critical
+        mitre: "T1611"
+      annotations:
+        summary: "Falco critical event on {{ $labels.hostname }}"
+        description: "Rule '{{ $labels.rule }}' fired. Priority: critical. Check Kibana falco-alerts index."
+        runbook_url: "https://falco.org/docs/rules/"
+    
+
+  # ── Workload Health ────────────────────────────────────────────────────────
+  - name: workload.rules
+    rules:
+    - alert: PodCrashLooping
+      expr: |
+        rate(kube_pod_container_status_restarts_total[15m]) * 60 * 15 > 3
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Pod crash-looping in {{ $labels.namespace }}"
+        description: "{{ $labels.pod }}/{{ $labels.container }} has restarted >3 times in 15m. May indicate exploit payload causing crash."
+
+    - alert: JuiceShopDown
+      expr: |
+        kube_deployment_status_replicas_available{namespace="juice-shop"} == 0
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Juice Shop has zero available replicas"
+        description: "All Juice Shop pods are down. Check for failed deployments or resource exhaustion from load testing."
+
+    - alert: JuiceShopHighRestarts
+      expr: |
+        rate(kube_pod_container_status_restarts_total{namespace="juice-shop"}[15m]) * 60 * 15 > 2
+      for: 0m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Juice Shop pod restarting"
+        description: "{{ $labels.pod }} restarted {{ $value | printf \"%.0f\" }} times in 15m. Could be from ZAP scan triggering unhandled crash."
+
+  # ── Infrastructure ─────────────────────────────────────────────────────────
+  - name: infrastructure.rules
+    rules:
+    - alert: NodeMemoryPressure
+      expr: |
+        (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Node {{ $labels.instance }} memory above 85%"
+        description: "Available memory: {{ $value | printf \"%.1f\" }}% used. Elasticsearch and Prometheus are memory-heavy; check logging/observability nodes first."
+
+    - alert: NodeDiskPressure
+      expr: |
+        (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) * 100 > 80
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Node {{ $labels.instance }} disk above 80%"
+        description: "Disk {{ $value | printf \"%.1f\" }}% used. PV nodes (logging, observability) are at risk of Elasticsearch or Prometheus OOM."
+
+    - alert: NodeHighCPU
+      expr: |
+        100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Node {{ $labels.instance }} CPU above 80%"
+        description: "Sustained high CPU for 10m. May be from concurrent ZAP scan + Trivy image scan hitting app node."
+
+  # ── ArgoCD GitOps ──────────────────────────────────────────────────────────
+  - name: argocd.rules
+    rules:
+    - alert: ArgoCDSyncFailed
+      expr: |
+        argocd_app_info{sync_status="Unknown"} == 1
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "ArgoCD app {{ $labels.name }} sync unknown"
+        description: "App {{ $labels.name }} in project {{ $labels.project }} has unknown sync status for 5m. GitOps pipeline may be broken."
+
+    - alert: ArgoCDAppDegraded
+      expr: |
+        argocd_app_info{health_status="Degraded"} == 1
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "ArgoCD app {{ $labels.name }} is degraded"
+        description: "App {{ $labels.name }} health is Degraded. Deployed manifest may have caused pod failure."

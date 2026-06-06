@@ -37,3 +37,5 @@ override.tf.json
 terraform.rc
 
 kind-config.yml
+bootstrap-secret.sh
+alertmanager-secrets.yaml

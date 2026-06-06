@@ -1,0 +1,6 @@
+nodeSelector:
+  node-role: platform
+
+# Required for Kind — kubelet serving certs are self-signed
+args:
+  - --kubelet-insecure-tls

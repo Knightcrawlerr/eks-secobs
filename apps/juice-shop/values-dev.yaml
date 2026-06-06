@@ -8,7 +8,7 @@ image:
 
 serviceAccount:
   create: true
-  automount: true
+  automount: false
   annotations: {}
   name: ""
 
@@ -22,22 +22,8 @@ networkPolicy:
 app:
   gateway:
     name: eg
-    enabled: true
     host: juice-shop.com
     namespace: envoy-gateway-system
-    tls:
-      - secretName: juice-shop-tls
-
-argocd:
-  name: argocd
-  namespace: argocd
-  host: argocd.juice-shop.com
-
-
-monitoring:
-  name: monitoring
-  namespace: monitoring
-  host: monitoring.juice-shop.com
 
 resources:
   requests:

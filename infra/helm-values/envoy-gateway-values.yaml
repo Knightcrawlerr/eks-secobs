@@ -1,0 +1,4 @@
+deployment:
+  pod:
+    nodeSelector:
+      node-role: platform

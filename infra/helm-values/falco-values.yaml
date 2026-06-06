@@ -1,0 +1,103 @@
+# Driver
+driver:
+  enabled: true
+  kind: modern_ebpf
+
+# metrics
+metrics:
+  enabled: true
+  interval: 1h
+  outputRule: true
+  resourceUtilizationEnabled: true
+
+# Service Monitor
+serviceMonitor:
+  create: true
+  path: /metrics
+  interval: 15s
+  labels:
+    release: monitoring
+
+# Falco DaemonSet tolerations 
+tolerations:
+  - key: node-role
+    operator: Equal
+    value: observability
+    effect: NoSchedule
+  - key: node-role
+    operator: Equal
+    value: logging
+    effect: NoSchedule
+
+# Falco output 
+falco:
+  rules_files:
+    - /etc/falco/falco_rules.yaml
+    - /etc/falco/falco_rules.local.yaml
+    - /etc/falco/rules.d
+  json_output: true
+  json_include_output_property: true
+  http_output:
+    enabled: true
+    url: "http://falco-falcosidekick:2801"
+    user_agent: "falcosecurity/falco"
+
+
+customRules:
+  rules-local.yaml: |-
+    - macro: calico_cni_binaries
+      condition: >
+        proc.name in (calico, portmap, loopback, bandwidth, host-local,
+                      calico-ipam, flannel, bridge, vlan, dhcp, ptp,
+                      tuning, firewall, sbr, static)
+        and proc.exepath startswith /opt/cni/bin/
+
+    - macro: kubelet_mount_activity
+      condition: >
+        proc.name = mount
+        and proc.cmdline contains "kubernetes.io~projected"
+
+    - rule: Drop and execute new binary in container
+      append: true
+      condition: >
+        and not calico_cni_binaries
+        and not kubelet_mount_activity
+
+
+# Falcosidekick 
+falcosidekick:
+  enabled: true
+
+  nodeSelector:
+    node-role: observability
+  tolerations:
+    - key: node-role
+      operator: Equal
+      value: observability
+      effect: NoSchedule
+
+  config:
+    extraEnv:
+      - name: ELASTICSEARCH_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: elasticsearch-elastic-password
+            key: elastic
+
+    elasticsearch:
+      hostport: "https://elasticsearch-es-http.logging.svc.cluster.local:9200"
+      index: "falco-alerts"
+      username: "elastic"
+      checkcert: false
+
+  serviceMonitor:
+    enabled: true
+    additionalLabels:
+      release: monitoring
+
+  alertmanager:
+    hostport: "http://monitoring-kube-prometheus-alertmanager.monitoring.svc.cluster.local:9093"
+    minimumpriority: "warning"
+
+
+

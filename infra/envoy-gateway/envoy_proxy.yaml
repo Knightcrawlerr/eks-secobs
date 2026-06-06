@@ -3,6 +3,10 @@ kind: EnvoyProxy
 metadata:
   name: proxy-config
   namespace: envoy-gateway-system
+  labels:
+    app.kubernetes.io/name: envoy-gateway
+    app.kubernetes.io/component: gateway-infrastructure
+    app.kubernetes.io/managed-by: kubectl
 spec:
   provider:
     type: Kubernetes

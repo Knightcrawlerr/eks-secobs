@@ -19,6 +19,7 @@ spec:
         app: {{ include "juice-shop.fullname" . }}
     spec:
       serviceAccountName: {{ include "juice-shop.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
       containers:
         - name: {{ include "juice-shop.fullname" . }}
           image: {{.Values.image.repository}}:{{.Values.image.tag}}

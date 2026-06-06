@@ -1,0 +1,26 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: kibana-httproute
+  namespace: logging
+  labels:
+    app.kubernetes.io/name: kibana
+    app.kubernetes.io/component: gateway-route
+    app.kubernetes.io/managed-by: kubectl
+spec:
+  parentRefs:
+    - name: eg
+      namespace: envoy-gateway-system
+      sectionName: https
+  hostnames:
+    - kibana.juice-shop.com
+  rules:
+    - matches:  
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - kind: Service
+          name: kibana-kb-http
+          port: 5601
+          weight: 1

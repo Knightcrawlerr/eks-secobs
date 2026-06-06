@@ -1,0 +1,26 @@
+nodeSelector:
+  kubernetes.io/os: linux
+  node-role: platform
+
+tolerations:
+  - effect: NoExecute
+    operator: Exists
+  - effect: NoSchedule
+    operator: Exists
+
+installation:
+  calicoNetwork:
+    ipPools:
+      - cidr: 10.244.0.0/16
+        encapsulation: VXLAN
+  controlPlaneNodeSelector:
+    node-role: platform
+  controlPlaneTolerations:
+    - key: "node-role"
+      operator: "Equal"
+      value: "observability"
+      effect: "NoSchedule"
+    - key: "node-role"
+      operator: "Equal"
+      value: "logging"
+      effect: "NoSchedule"

@@ -1,0 +1,66 @@
+tolerations:
+  - key: "node-role"
+    operator: "Equal"
+    value: "logging"
+    effect: "NoSchedule"
+  - key: "node-role"
+    operator: "Equal"
+    value: "observability"
+    effect: "NoSchedule"
+env:
+  - name: ELASTICSEARCH_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: elasticsearch-es-elastic-user
+        key: elastic
+
+config:
+  inputs: |
+    [INPUT]
+        Name              tail
+        Path              /var/log/containers/juice-shop-*.log
+        Parser            cri
+        Tag               kube.*
+        Refresh_Interval  5
+        Mem_Buf_Limit     50MB
+        Skip_Long_Lines   On
+        Read_From_Head    On
+        DB                /var/log/flb_juice_shop.db
+
+
+  filters: |
+    [FILTER]
+        Name                kubernetes
+        Match               kube.*
+        Kube_URL            https://kubernetes.default.svc:443
+        Kube_Tag_Prefix     kube.var.log.containers.
+        Merge_Log           On
+        Keep_Log            Off
+        K8S-Logging.Parser  On
+    
+    
+    [FILTER]
+        Name                parser
+        Match               kube.*
+        Key_Name            message
+        Parser              juice_shop_access
+        Reserve_Data        On
+
+  outputs: |
+    [OUTPUT]
+        Name                es
+        Match               kube.*
+        Host                elasticsearch-es-http.logging.svc.cluster.local
+        Port                9200
+        Index               juice-shop-logs
+        HTTP_User           elastic
+        HTTP_Passwd         ${ELASTICSEARCH_PASSWORD}
+        tls                 On
+        tls.verify          Off
+        Suppress_Type_Name  On
+
+  customParsers: |
+    [PARSER]
+        Name        juice_shop_access
+        Format      regex
+        Regex       ^(?<remote_addr>[^ ]*) [^ ]* (?<user>[^ ]*) \[(?<time>[^\]]*)\] "(?<method>[A-Z]+) (?<path>[^ ]*) [^"]*" (?<status>[0-9]+) (?<size>[0-9-]+)(?: "(?<referer>[^"]*)" "(?<user_agent>[^"]*)")?

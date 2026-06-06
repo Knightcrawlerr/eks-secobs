@@ -1,0 +1,91 @@
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: secobs-alert-config
+  namespace: monitoring
+  labels:
+    release: monitoring
+spec:
+  route:
+    receiver: 'drop'
+    groupBy: ['alertname', 'namespace', 'severity']
+    groupWait: 30s
+    groupInterval: 5m
+    repeatInterval: 4h
+    routes:
+      # Critical security alerts → Slack immediately
+      - matchers:
+          - name: severity
+            matchType: "="
+            value: "critical"
+        receiver: 'slack-critical'
+        repeatInterval: 1h
+        continue: false
+      # Warning alerts → Slack with delay, email once
+      - matchers:
+          - name: severity
+            matchType: "="
+            value: "warning"
+        receiver: 'slack-warning'
+        repeatInterval: 6h
+        continue: true
+      - matchers:
+          - name: severity
+            matchType: "="
+            value: "warning"
+        receiver: 'send-email'
+        repeatInterval: 24h
+        continue: false
+
+  receivers:
+  - name: 'drop'
+
+  - name: 'slack-critical'
+    slackConfigs:
+    - apiURL:
+        name: alertmanager-secrets
+        key: slack-webhook-url
+      channel: '#eks-secobs-alerts'
+      iconEmoji: ':red_circle:'
+      sendResolved: true
+      title: '🚨 CRITICAL — EKS SecObs'
+      text: |-
+        {{ range .Alerts }}
+        *Alert:* {{ .Labels.alertname }}
+        *Severity:* {{ .Labels.severity }}
+        *Namespace:* {{ .Labels.namespace }}
+        *Description:* {{ .Annotations.description }}
+        *Runbook:* {{ .Annotations.runbook_url }}
+        ---
+        {{ end }}
+
+  - name: 'slack-warning'
+    slackConfigs:
+    - apiURL:
+        name: alertmanager-secrets
+        key: slack-webhook-url
+      channel: '#eks-secobs-alerts'
+      iconEmoji: ':warning:'
+      sendResolved: true
+      title: '⚠️ WARNING — EKS SecObs'
+      text: |-
+        {{ range .Alerts }}
+        *Alert:* {{ .Labels.alertname }}
+        *Severity:* {{ .Labels.severity }}
+        *Namespace:* {{ .Labels.namespace }}
+        *Description:* {{ .Annotations.description }}
+        *Runbook:* {{ .Annotations.runbook_url }}
+        ---
+        {{ end }}
+
+  - name: 'send-email'
+    emailConfigs:
+    - to: 'randomjunkerr@gmail.com'
+      from: 'ppccashew@gmail.com'
+      sendResolved: true
+      smarthost: smtp.gmail.com:587
+      authUsername: 'ppccashew@gmail.com'
+      authIdentity: 'ppccashew@gmail.com'
+      authPassword:
+        name: alertmanager-secrets
+        key: gmail-pass

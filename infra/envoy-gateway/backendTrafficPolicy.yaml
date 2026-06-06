@@ -1,0 +1,17 @@
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: argocd-backend-traffic-policy
+  namespace: argocd                     
+  labels:
+    app.kubernetes.io/name: envoy-gateway
+    app.kubernetes.io/component: gateway-infrastructure
+    app.kubernetes.io/managed-by: kubectl
+spec:
+  targetRefs:
+  - group: gateway.networking.k8s.io
+    name: argocd-httproute   
+    kind: HTTPRoute
+  timeout:
+    http:
+      requestTimeout: 0s

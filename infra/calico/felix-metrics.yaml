@@ -1,0 +1,35 @@
+# Headless Service so Prometheus can reach each calico-node pod individually
+apiVersion: v1
+kind: Service
+metadata:
+  name: calico-felix-metrics
+  namespace: calico-system
+  labels:
+    app.kubernetes.io/name: calico-felix-metrics
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: calico-node   # Tigera operator label — NOT app=calico-node
+  ports:
+    - name: metrics
+      port: 9091
+      targetPort: 9091
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: calico-felix
+  namespace: monitoring
+  labels:
+    release: monitoring
+spec:
+  namespaceSelector:
+    matchNames:
+      - calico-system
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: calico-felix-metrics
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s

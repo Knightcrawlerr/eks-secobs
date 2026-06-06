@@ -1,0 +1,92 @@
+{{- if .Values.networkPolicy.enabled }}
+---
+# Policy 1: Default Deny
+# Selects ALL pods in the namespace, declares both policyTypes but specifies
+# no ingress or egress rules. This activates the whitelist model — every pod
+# is now denied all traffic until an explicit allow policy selects it.
+# Without this, pods with no matching policy get unrestricted traffic.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "juice-shop.fullname" . }}-default-deny
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: {{ include "juice-shop.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+# Policy 2: Juice Shop Allow
+# Selects only juice-shop app pods (via the `app` label set in deployment.yaml).
+# Ingress: only from Envoy proxy pods in envoy-gateway-system namespace.
+#   - namespaceSelector matches the namespace by its automatic metadata.name label
+#   - podSelector matches only the proxy pods (not the envoy-gateway control plane pod)
+#   - Both selectors are under the same `from` entry — they are AND'd together.
+#     If they were separate entries they would be OR'd, which would allow any pod
+#     in envoy-gateway-system OR any pod with component=proxy anywhere.
+# Egress: blocked entirely. Juice Shop has no upstream dependencies.
+#   DNS egress is handled separately in Policy 3 below.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "juice-shop.fullname" . }}-allow
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: {{ include "juice-shop.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ include "juice-shop.fullname" . }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.app.gateway.namespace }}
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/component: proxy
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.port }}
+---
+# Policy 3: DNS Egress
+# Selects ALL pods. Allows egress to kube-dns on port 53 (UDP and TCP).
+# UDP is the default DNS transport. TCP is used for responses over 512 bytes
+# (e.g. DNSSEC, large SRV records) and for zone transfers. Always allow both.
+# kube-dns pods in kube-system carry the label: k8s-app=kube-dns.
+# This is a Kubernetes default — safe to rely on.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "juice-shop.fullname" . }}-allow-dns
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: {{ include "juice-shop.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+{{- end }}

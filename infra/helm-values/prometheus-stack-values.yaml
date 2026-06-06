@@ -1,0 +1,81 @@
+grafana:
+  grafana.ini:
+    server:
+      root_url: "https://monitoring.juice-shop.com/grafana"
+      serve_from_sub_path: true
+  serviceMonitor:
+    enabled: true
+    path: "/grafana/metrics"
+    scheme: http
+    scrapeTimeout: 30s
+  ingress:
+    enabled: false
+  serviceAccount:
+    autoMount: false
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      searchNamespace: ALL
+  nodeSelector:
+    node-role: observability
+  tolerations:
+    - key: "node-role"
+      operator: "Equal"
+      value: "observability"
+      effect: "NoSchedule"
+
+prometheus:
+  prometheusSpec:
+    externalUrl: "https://monitoring.juice-shop.com/prometheus"
+    routePrefix: /prometheus
+    nodeSelector:
+      node-role: observability
+    tolerations:
+      - key: "node-role"
+        operator: "Equal"
+        value: "observability"
+        effect: "NoSchedule"
+  ingress:
+    enabled: false
+
+alertmanager:
+  alertmanagerSpec:
+    externalUrl: "https://monitoring.juice-shop.com/alertmanager"
+    routePrefix: /alertmanager
+    nodeSelector:
+      node-role: observability
+    tolerations:
+      - key: "node-role"
+        operator: "Equal"
+        value: "observability"
+        effect: "NoSchedule"
+    alertmanagerConfigSelector:
+      matchLabels:
+        release: monitoring
+    alertmanagerConfigMatcherStrategy:
+      type: None
+  ingress:
+    enabled: false
+
+kube-state-metrics:
+  nodeSelector:
+    node-role: observability
+  tolerations:
+    - key: "node-role"
+      operator: "Equal"
+      value: "observability"
+      effect: "NoSchedule"
+
+prometheusOperator:
+  nodeSelector:
+    node-role: observability
+  tolerations:
+    - key: "node-role"
+      operator: "Equal"
+      value: "observability"
+      effect: "NoSchedule"
+
+
+

@@ -1,0 +1,141 @@
+# Policy 1: Default Deny
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: logging
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+# Policy 2: elasticsearch
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: elasticsearch-netpol
+  namespace: logging
+spec:
+  podSelector:
+    matchLabels:
+      elasticsearch.k8s.elastic.co/cluster-name: elasticsearch
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Fluent Bit → ES on 9200
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: fluent-bit
+      ports:
+        - port: 9200
+    # Kibana → ES on 9200
+    - from:
+        - podSelector:
+            matchLabels:
+              kibana.k8s.elastic.co/name: kibana
+      ports:
+        - port: 9200
+    # ECK operator → ES (health checks, config)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: elastic-system
+      ports:
+        - port: 9200
+        - port: 9300
+    # S3 CronJob → ES (scan result indexing)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: 9200
+  egress:
+    # DNS
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # ES transport between nodes (single node but ECK expects this open)
+    - to:
+        - podSelector:
+            matchLabels:
+              elasticsearch.k8s.elastic.co/cluster-name: elasticsearch
+      ports:
+        - port: 9300
+---
+# Policy 3: kibana
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kibana-netpol
+  namespace: logging
+spec:
+  podSelector:
+    matchLabels:
+      kibana.k8s.elastic.co/name: kibana
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Envoy Gateway proxy → Kibana on 5601
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+      ports:
+        - port: 5601
+  egress:
+    # DNS
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # Kibana → ES on 9200
+    - to:
+        - podSelector:
+            matchLabels:
+              elasticsearch.k8s.elastic.co/cluster-name: elasticsearch
+      ports:
+        - port: 9200
+---
+# Policy 4: fluent-bit
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: fluent-bit-netpol
+  namespace: logging
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: fluent-bit
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Prometheus scrape on 2020 (metrics endpoint)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: 2020
+  egress:
+    # DNS
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # Fluent Bit → ES on 9200
+    - to:
+        - podSelector:
+            matchLabels:
+              elasticsearch.k8s.elastic.co/cluster-name: elasticsearch
+      ports:
+        - port: 9200

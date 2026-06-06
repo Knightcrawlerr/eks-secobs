@@ -1,0 +1,544 @@
+# Monitoring Namespace — NetworkPolicy
+# Applied as a standalone manifest, managed by ArgoCD.
+# Location: infrastructure/network-policies/monitoring-netpol.yaml
+#
+# Components covered:
+#   Prometheus        — scrapes all namespaces, queried by Grafana
+#   Grafana           — queried by users via Envoy proxy, scraped by Prometheus
+#   Alertmanager      — receives alerts from Prometheus + Falcosidekick (future)
+#   Prometheus Op     — manages Prometheus/Alertmanager CRDs via K8s API
+#   kube-state-metrics — scraped by Prometheus only
+#   node-exporter     — scraped by Prometheus only (DaemonSet, all nodes)
+---
+# Policy 1: Default Deny
+# Baseline — no traffic in or out until explicitly allowed below.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: monitoring
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+# Policy 2: DNS Egress (all pods)
+# Both UDP and TCP port 53 — TCP handles responses over 512 bytes.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+  namespace: monitoring
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# Policy 3: Prometheus — scrape egress
+#
+# Rule A — pod-based targets (no `to:` = all pod destinations, port-scoped)
+# Prometheus cannot reach arbitrary ports on pods — only these metrics ports.
+#   3000  — grafana metrics
+#   8080  — alertmanager web, kube-state-metrics, prometheus operator webhook
+#   9090  — prometheus self-scrape
+#   9093  — alertmanager alerts
+#   9100  — node-exporter
+#   9153  — CoreDNS metrics
+#   10250 — prometheus operator pod metrics (pod IP, not node IP)
+#
+# Rule B — node host IPs (ipBlock, not podSelector)
+# kubelet, cadvisor, and kube-apiserver run on host network — not reachable
+# via podSelector. Prometheus discovers them via the K8s Node API.
+#   6443  — kube-apiserver metrics
+#   10250 — kubelet + cadvisor
+#   10255 — kubelet read-only (Kind fallback)
+# Kind node CIDR: 172.18.0.0/24
+# EKS: replace with your VPC node subnet CIDR
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-scrape-egress
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 3000
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 9090
+        - protocol: TCP
+          port: 9093
+        - protocol: TCP
+          port: 9100
+        - protocol: TCP
+          port: 9153
+        - protocol: TCP
+          port: 10250
+        - protocol: TCP
+          port: 2801
+        - protocol: TCP
+          port: 8765
+        - protocol: TCP
+          port: 8082
+        - protocol: TCP
+          port: 8084
+        - protocol: TCP
+          port: 9091
+        - protocol: TCP
+          port: 19001
+        - protocol: TCP
+          port: 7472
+        - protocol: TCP
+          port: 7473
+    - to:
+        - ipBlock:
+            cidr: 172.18.0.0/24
+      ports:
+        - protocol: TCP
+          port: 6443
+        - protocol: TCP
+          port: 10250
+        - protocol: TCP
+          port: 10255
+---
+# Policy 4: Prometheus operator — Kubernetes API egress
+# Operator watches ServiceMonitor/PodMonitor CRDs and manages StatefulSets.
+# Needs egress to K8s API server ClusterIP (10.96.0.1) on port 443.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-operator-api-egress
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app: kube-prometheus-stack-operator
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.96.0.1/32
+        - ipBlock:
+            cidr: 172.18.0.4/32
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 6443
+---
+# Policy 5: Prometheus operator — webhook ingress from API server
+# The K8s API server calls back into the operator on port 10250 and 443
+# to validate PrometheusRule/ServiceMonitor/AlertmanagerConfig CRDs.
+# API server runs on the control plane node: 172.18.0.7
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-operator-webhook-ingress
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app: kube-prometheus-stack-operator
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: 172.18.0.7/32
+      ports:
+        - protocol: TCP
+          port: 10250
+        - protocol: TCP
+          port: 443
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: 10250
+---
+# Policy 6: Grafana — Prometheus query egress + sidecar API server access
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-grafana-prometheus-egress
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: grafana
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: 9090
+    # API server: sidecar connects to 10.96.0.1:443 which DNAT rewrites to 172.18.0.4:6443
+    # Calico evaluates egress BEFORE DNAT, so match the pre-DNAT destination (node IP, port 443)
+    - to:
+        - ipBlock:
+            cidr: 172.18.0.6/32 # kube-apiserver pod IP
+        - ipBlock:
+            cidr: 172.18.0.4/32 # control-plane node IP (Kind), also matches EKS control plane
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 6443
+---
+# Policy 7: Grafana — ingress from Envoy proxy (browser access)
+# namespaceSelector + podSelector AND'd — only Envoy proxy pods.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-grafana-ingress-envoy
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: grafana
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/component: proxy
+      ports:
+        - protocol: TCP
+          port: 3000
+---
+# Policy 8: Grafana — ingress from Prometheus (metrics scraping)
+# Prometheus scrapes Grafana's own metrics on port 3000.
+# Required for the Grafana Overview dashboard to show data.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-grafana-ingress-prometheus
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: grafana
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: 3000
+---
+# Policy 9: Prometheus — ingress from Envoy proxy (browser access)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-ingress-envoy
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/component: proxy
+      ports:
+        - protocol: TCP
+          port: 9090
+---
+# Policy 10: Prometheus — ingress from Grafana (metrics queries)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-ingress-grafana
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: grafana
+      ports:
+        - protocol: TCP
+          port: 9090
+---
+# Policy 11: Alertmanager — ingress
+# Sources:
+#   - Prometheus on 9093 (firing alerts)
+#   - Alertmanager replicas on 9094 TCP+UDP (HA gossip mesh)
+#   - Falcosidekick on 9093 (future — uncomment when Falco deployed)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-alertmanager-ingress
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: alertmanager
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: 9093
+        - protocol: TCP
+          port: 8080
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: alertmanager
+      ports:
+        - protocol: TCP
+          port: 9094
+        - protocol: UDP
+          port: 9094
+        - protocol: TCP
+          port: 8080
+    # Falcosidekick (uncomment when Falco deployed)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: falco-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: falcosidekick
+      ports:
+        - protocol: TCP
+          port: 9093
+---
+# Policy 12: Alertmanager — egress
+# Replica mesh gossip between Alertmanager pods on 9094.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-alertmanager-egress
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: alertmanager
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: alertmanager
+      ports:
+        - protocol: TCP
+          port: 9094
+        - protocol: UDP
+          port: 9094
+---
+# Policy 13: kube-state-metrics — ingress from Prometheus only
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-kube-state-metrics-ingress
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: kube-state-metrics
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+# Policy 14: kube-state-metrics — Kubernetes API egress
+# Watches all K8s resources to generate cluster state metrics.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-kube-state-metrics-api-egress
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: kube-state-metrics
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.96.0.1/32
+        - ipBlock:
+            cidr: 172.18.0.4/32
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 6443
+---
+# Policy 15: node-exporter — ingress from Prometheus only
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-node-exporter-ingress
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus-node-exporter
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: 9100
+---
+# Policy 16: Admission webhook Jobs — Kubernetes API egress
+# kube-prometheus-stack runs two pre-install/pre-upgrade hook Jobs:
+#   - admission-create: generates TLS cert, writes to a Secret
+#   - admission-patch:  patches ValidatingWebhookConfiguration with the cert
+# Both need egress to the K8s API server (10.96.0.1:443).
+# Without this policy, helm install/upgrade times out during pre-install hooks.
+# These are ephemeral Job pods — the policy must exist before helm runs.
+# Selector covers both Jobs via the shared component label.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-admission-webhook-api-egress
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: kube-prometheus-stack-prometheus-operator
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.96.0.1/32 # ClusterIP of K8s API server
+        - ipBlock:
+            cidr: 172.18.0.4/32  # Control-plane node IP
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 6443
+    # DNS egress also needed — Jobs resolve API server hostname
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# Policy 17:  Alertmanager — ingress from Envoy proxy (browser access)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-alertmanager-ingress-envoy
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: alertmanager
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/component: proxy
+      ports:
+        - protocol: TCP
+          port: 9093  
+---
+# Policy 18: Alertmanager — external notification egress
+# Allows Alertmanager to reach Slack webhooks (443) and Gmail SMTP (587).
+# Kind: traffic exits via Docker NAT. EKS: exits via VPC NAT gateway.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-alertmanager-external-egress
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: alertmanager
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 587
+
