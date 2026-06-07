@@ -28,31 +28,20 @@ jobs:
     needs: secret-scan
     steps:
       - uses: actions/checkout@v6.0.2
-      - name: Install Checkov
-        run: pip install checkov --quiet --break-system-packages
-
-      - name: Checkov - SARIF output
-        run: |
-          checkov -d . \
-            --framework terraform,helm,kubernetes \
-            --var-file apps/juice-shop/values-dev.yaml \
-            --output sarif \
-            --output-file checkov-results.sarif \
-            --soft-fail || true
-      - name: Checkov - JSON output  
-        run: |
-          checkov -d . \
-            --framework terraform,helm,kubernetes \
-            --var-file apps/juice-shop/values-dev.yaml \
-            --output json \
-            --output-file checkov-results.json \
-            --soft-fail || true
+      - name: Checkov - IaC Security Scanning
+        uses: bridgecrewio/checkov-action@v12.1347.0
+        with:
+          directory: .
+          framework: helm,kubernetes
+          output_format: sarif
+          output_file_path: console,results.sarif
+          soft_fail: false
 
       - name: Upload Checkov SARIF results to Github Security
         uses: github/codeql-action/upload-sarif@v4 
         if: always()
         with:
-          sarif_file: checkov-results.sarif
+          sarif_file: results.sarif
           category: checkov-iac
 
       - name: Upload Checkov results to S3
@@ -62,11 +51,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ vars.AWS_REGION }}  
         run: |
-          BUCKET="${{ vars.S3_BUCKET_NAME }}"
-          DATE="$(date +%Y-%m-%d)"
-          SHA="${{ github.sha }}"
-          aws s3 cp checkov-results.sarif "s3://${BUCKET}/checkov/${DATE}/${SHA}.sarif"
-          aws s3 cp checkov-results.json "s3://${BUCKET}/checkov/${DATE}/${SHA}.json"
+          aws s3 cp results.sarif s3://${{ vars.S3_BUCKET_NAME }}/checkov/$(date +%Y-%m-%d)/${{ github.sha }}.sarif
     
   manifest-scan:
     runs-on: ubuntu-latest
