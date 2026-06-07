@@ -31,13 +31,20 @@ jobs:
       - name: Install Checkov
         run: pip install checkov --quiet --break-system-packages
 
-      -  name: Checkov — IaC scan (SARIF + JSON in one run)
-         run: |
+      - name: Checkov - SARIF output
+        run: |
           checkov -d . \
             --framework terraform,helm,kubernetes \
+            --var-file apps/juice-shop/values-dev.yaml \
             --output sarif \
-            --output json \
             --output-file checkov-results.sarif \
+            --soft-fail || true
+      - name: Checkov - JSON output  
+        run: |
+          checkov -d . \
+            --framework terraform,helm,kubernetes \
+            --var-file apps/juice-shop/values-dev.yaml \
+            --output json \
             --output-file checkov-results.json \
             --soft-fail || true
 
@@ -55,8 +62,11 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ vars.AWS_REGION }}  
         run: |
-          aws s3 cp checkov-results.json s3://${{ vars.S3_BUCKET_NAME }}/checkov/$(date +%Y-%m-%d)/${{ github.sha }}.json
-          aws s3 cp checkov-results.sarif s3://${{ vars.S3_BUCKET_NAME }}/checkov/$(date +%Y-%m-%d)/${{ github.sha }}.sarif
+          BUCKET="${{ vars.S3_BUCKET_NAME }}"
+          DATE="$(date +%Y-%m-%d)"
+          SHA="${{ github.sha }}"
+          aws s3 cp checkov-results.sarif "s3://${BUCKET}/checkov/${DATE}/${SHA}.sarif"
+          aws s3 cp checkov-results.json "s3://${BUCKET}/checkov/${DATE}/${SHA}.json"
     
   manifest-scan:
     runs-on: ubuntu-latest
