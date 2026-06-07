@@ -47,7 +47,8 @@ jobs:
       - name: Checkov - JSON output
         if: always()
         run: |
-          checkov -d . \
+          pip install checkov --quiet --break-system-packages
+          python -m checkov.main -d . \
             --framework terraform,helm,kubernetes \
             --output json \
             --output-file checkov-results.json \
