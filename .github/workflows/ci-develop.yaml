@@ -29,7 +29,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6.0.2
       - name: Checkov - IaC Security Scanning
-        uses: bridgecrewio/checkov-action@v12.1347.0
+        uses: bridgecrewio/checkov-action@v12
         with:
           directory: .
           framework: terraform,helm,kubernetes
@@ -44,6 +44,15 @@ jobs:
           sarif_file: results.sarif
           category: checkov-iac
 
+      - name: Checkov - JSON output
+        if: always()
+        run: |
+          checkov -d . \
+            --framework terraform,helm,kubernetes \
+            --output json \
+            --output-file checkov-results.json \
+            --soft-fail || true
+
       - name: Upload Checkov results to S3
         if: always()
         env:
@@ -51,7 +60,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ vars.AWS_REGION }}  
         run: |
-          aws s3 cp results.sarif s3://${{ vars.S3_BUCKET_NAME }}/checkov/$(date +%Y-%m-%d)/${{ github.sha }}.sarif
+          aws s3 cp checkov-results.json s3://${{ vars.S3_BUCKET_NAME }}/checkov/$(date +%Y-%m-%d)/${{ github.sha }}.json
     
   manifest-scan:
     runs-on: ubuntu-latest
