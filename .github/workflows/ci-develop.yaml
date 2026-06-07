@@ -34,14 +34,14 @@ jobs:
           directory: .
           framework: terraform,helm,kubernetes
           output_format: cli,sarif
-          output_file_path: console,checkov-results.sarif
+          output_file_path: console,results.sarif
           soft_fail: false
 
       - name: Upload Checkov SARIF results to Github Security
         uses: github/codeql-action/upload-sarif@v4 
         if: always()
         with:
-          sarif_file: checkov-results.sarif
+          sarif_file: results.sarif
           category: checkov-iac
 
       - name: Upload Checkov results to S3
@@ -51,7 +51,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ vars.AWS_REGION }}  
         run: |
-          aws s3 cp checkov-results.sarif s3://${{ vars.S3_BUCKET_NAME }}/checkov/$(date +%Y-%m-%d)/${{ github.sha }}.sarif
+          aws s3 cp results.sarif s3://${{ vars.S3_BUCKET_NAME }}/checkov/$(date +%Y-%m-%d)/${{ github.sha }}.sarif
     
   manifest-scan:
     runs-on: ubuntu-latest
