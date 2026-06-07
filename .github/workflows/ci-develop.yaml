@@ -16,6 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6.0.2
+        with:
+          fetch-depth: 0
       - name: Gitleaks - Secret Detection
         uses: gitleaks/gitleaks-action@v3.0.0
         env:
@@ -53,7 +55,7 @@ jobs:
     
   manifest-scan:
     runs-on: ubuntu-latest
-    needs: iac-scan
+    needs: secret-scan
     steps:
       - uses: actions/checkout@v6.0.2
       - name: Trivy — Kubernetes manifest scan
