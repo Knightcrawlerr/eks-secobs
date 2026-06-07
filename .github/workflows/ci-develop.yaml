@@ -33,6 +33,7 @@ jobs:
         with:
           directory: .
           framework: helm,kubernetes
+          var_file: apps/juice-shop/values-dev.yaml
           output_format: cli,sarif
           soft_fail: false
 
