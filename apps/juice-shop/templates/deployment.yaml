@@ -20,9 +20,11 @@ spec:
     spec:
       serviceAccountName: {{ include "juice-shop.serviceAccountName" . }}
       automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
+      securityContext: {{- toYaml .Values.podSecurityContext | nindent 4 }}
       containers:
         - name: {{ include "juice-shop.fullname" . }}
-          image: {{.Values.image.repository}}:{{.Values.image.tag}}
+          repository: {{.Values.image.repository}}
+          imagePullPolicy: {{.Values.image.pullPolicy}}
           ports:
             - containerPort: {{.Values.service.port}}
               name: http

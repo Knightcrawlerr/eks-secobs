@@ -4,7 +4,6 @@ namespace: juice-shop
 image:
   repository: ghcr.io/knightcrawlerr/juice-shop
   pullPolicy: Always
-  tag: "sha-c4ed789af0ce4aa152a818e34c0a6e2ba7f84dbb"
 
 serviceAccount:
   create: true
@@ -32,6 +31,14 @@ resources:
   limits:
     cpu: "500m"
     memory: "512Mi"
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault  # Seccomp restricts the syscalls a container can make
+
 
 securityContext:
   runAsNonRoot: true
