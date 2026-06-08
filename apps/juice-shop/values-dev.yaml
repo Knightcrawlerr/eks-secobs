@@ -2,7 +2,7 @@ replicaCount: 2
 namespace: juice-shop
 
 image:
-  repository: ghcr.io/knightcrawlerr/juice-shop
+  repository: ghcr.io/knightcrawlerr/juice-shop@sha256:9e68aa58eb7321f794798eb33d7200462d9965b9de3e0cce45c7ef8dd7b8ea25
   pullPolicy: Always
   tag: "sha-c4ed789af0ce4aa152a818e34c0a6e2ba7f84dbb"
 
