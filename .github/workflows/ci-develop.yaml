@@ -4,6 +4,7 @@ on:
     branches:
       - develop
     paths-ignore:
+        - "apps/juice-shop/values-*.yaml"
         - "*.md"
         - "LICENSE"
 
